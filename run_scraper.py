@@ -1,14 +1,7 @@
 #!/usr/bin/env python3
 """
 Real Estate Scraper Runner
-
-This script provides a command-line interface to run property scrapers
-and optionally upload the results to the Django API.
-
-Usage:
-    python run_scraper.py --scraper test_scraping1 --limit 5 --upload
-    python run_scraper.py --all --limit 3 --upload
-    python run_scraper.py --list
+Command-line interface to run property scrapers and optionally upload results to Django API.
 """
 
 import argparse
@@ -18,7 +11,7 @@ import sys
 import importlib.util
 from pathlib import Path
 
-# Add the bot directory to Python path
+# Add bot directory to Python path
 BOT_DIR = Path(__file__).parent / 'real-estate-scraper-bot'
 SCRAPERS_DIR = BOT_DIR / 'scrapers'
 
@@ -47,7 +40,6 @@ def get_available_scrapers():
 def run_scraper(scraper_name, limit_properties=None):
     """Run a specific scraper"""
     try:
-        # Import the scraper module
         spec = importlib.util.spec_from_file_location(
             scraper_name, 
             SCRAPERS_DIR / f"{scraper_name}.py"
@@ -55,16 +47,10 @@ def run_scraper(scraper_name, limit_properties=None):
         scraper_module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(scraper_module)
         
-        # Check if the module has a run_scraper function
         if hasattr(scraper_module, 'run_scraper'):
-            print(f"Running scraper: {scraper_name}")
             result = scraper_module.run_scraper(limit_properties)
             return result
         else:
-            # If no run_scraper function, try to execute the main logic
-            print(f"Running scraper: {scraper_name} (executing main logic)")
-            
-            # Execute the module's main logic
             if hasattr(scraper_module, 'homesData'):
                 properties = scraper_module.homesData
                 if limit_properties:
@@ -124,13 +110,9 @@ def upload_to_django(properties, api_url="http://localhost:8000/api"):
     """Upload scraped properties to Django API"""
     try:
         import requests
-        
-        # You would need to implement authentication here
-        # For now, this is a placeholder
         print(f"Would upload {len(properties)} properties to {api_url}")
         print("Note: Authentication not implemented in this script")
         return True
-        
     except ImportError:
         print("requests library not available for Django upload")
         return False
@@ -160,7 +142,6 @@ def main():
         return
     
     if args.scraper:
-        # Run specific scraper
         if args.scraper not in get_available_scrapers():
             print(f"Error: Scraper '{args.scraper}' not found")
             print("Available scrapers:", get_available_scrapers())
@@ -169,7 +150,7 @@ def main():
         result = run_scraper(args.scraper, args.limit)
         
         if result.get('success'):
-            print(f"✅ Scraper {args.scraper} completed successfully")
+            print(f"Scraper {args.scraper} completed successfully")
             print(f"   Properties found: {len(result.get('properties', []))}")
             
             if args.upload:
@@ -180,17 +161,16 @@ def main():
                     json.dump(result, f, ensure_ascii=False, indent=2)
                 print(f"   Results saved to: {args.output}")
         else:
-            print(f"❌ Scraper {args.scraper} failed: {result.get('error')}")
+            print(f"Scraper {args.scraper} failed: {result.get('error')}")
     
     elif args.all:
-        # Run all scrapers
         print("Running all available scrapers...")
         result = run_all_scrapers(args.limit)
         
         if result.get('success'):
-            print("✅ All scrapers completed")
+            print("All scrapers completed")
             for scraper_result in result.get('results', []):
-                status = "✅" if scraper_result['success'] else "❌"
+                status = "SUCCESS" if scraper_result['success'] else "FAILED"
                 print(f"   {status} {scraper_result['scraper']}: {scraper_result.get('properties_found', 0)} properties")
                 if scraper_result.get('error'):
                     print(f"      Error: {scraper_result['error']}")
@@ -200,7 +180,7 @@ def main():
                     json.dump(result, f, ensure_ascii=False, indent=2)
                 print(f"   Results saved to: {args.output}")
         else:
-            print(f"❌ Error running all scrapers: {result.get('error')}")
+            print(f"Error running all scrapers: {result.get('error')}")
 
 
 if __name__ == "__main__":

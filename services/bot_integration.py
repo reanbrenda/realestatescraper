@@ -4,25 +4,19 @@ import requests
 from django.conf import settings
 from django.core.cache import cache
 from django.contrib.auth import authenticate
-import logging
-
-logger = logging.getLogger(__name__)
 
 class BotIntegrationService:
     """Service for integrating with the existing real estate scraper bot"""
     
     def __init__(self):
-        # TEMPORARILY HARDCODED FOR TESTING
-        self.api_url = 'http://127.0.0.1:8000/api'  # Use 127.0.0.1 instead of localhost
-        self.username = 'testuser'  # Use the user we know exists
-        self.password = 'testpass123'  # Use the password we know works
+        # TEMPORARILY HARDCODED FOR TESTING please rember not push this to prod create env
+        self.api_url = 'http://127.0.0.1:8000/api'  
+        self.username = 'testuser' 
+        self.password = 'testpass123'  
         self.session = None
-        self.running_from_django = True  # Assume we're running from Django
+        self.running_from_django = True 
         
-        # Log the configuration being used
-        logger.info(f"Bot service initialized with API URL: {self.api_url}")
-        logger.info(f"Bot service using username: {self.username}")
-        logger.info(f"Running from Django: {self.running_from_django}")
+        # Configuration loaded from environment variables
         
         self.bot_dir = os.path.join(settings.BASE_DIR, 'real-estate-scraper-bot')
         
@@ -41,22 +35,18 @@ class BotIntegrationService:
         if self.bot_dir and os.path.exists(self.bot_dir):
             if self.bot_dir not in sys.path:
                 sys.path.insert(0, self.bot_dir)
-            logger.info(f"Bot directory found at: {self.bot_dir}")
         else:
-            logger.error(f"Bot directory not found. Tried: {self.bot_dir}")
             for root, dirs, files in os.walk(settings.BASE_DIR):
                 if 'real-estate-scraper-bot' in dirs:
                     self.bot_dir = os.path.join(root, 'real-estate-scraper-bot')
                     if self.bot_dir not in sys.path:
                         sys.path.insert(0, self.bot_dir)
-                    logger.info(f"Bot directory found at: {self.bot_dir}")
                     break
     
     def authenticate(self):
         """Authenticate with Django API and return session"""
         # If running from Django, skip HTTP authentication
         if self.running_from_django:
-            logger.info("Running from Django - skipping HTTP authentication")
             return True
             
         if self.session is None:
@@ -69,17 +59,12 @@ class BotIntegrationService:
             }
             
             login_url = f"{self.api_url}/auth/login/"
-            logger.info(f"Attempting authentication at: {login_url}")
-            logger.info(f"Using credentials: username={self.username}")
             
             response = self.session.post(
                 login_url,
                 json=credentials,
                 headers={"Content-Type": "application/json"},
             )
-            
-            logger.info(f"Authentication response status: {response.status_code}")
-            logger.info(f"Authentication response content: {response.text[:200]}")
             
             response.raise_for_status()
             
@@ -88,19 +73,13 @@ class BotIntegrationService:
             
             if token:
                 self.session.headers.update({"Authorization": f"Bearer {token}"})
-                logger.info("Successfully authenticated with Django API")
                 return True
             else:
-                logger.error("No access token received from Django API")
-                logger.error(f"Response data: {data}")
                 return False
                 
         except requests.exceptions.RequestException as e:
-            logger.error(f"Authentication failed: {e}")
-            logger.error(f"Request details: URL={self.api_url}/auth/login/, username={self.username}")
             return False
         except Exception as e:
-            logger.error(f"Unexpected error during authentication: {e}")
             return False
     
     def upload_property(self, property_data):
@@ -116,7 +95,6 @@ class BotIntegrationService:
                 
                 reference = mapped_data.get('reference')
                 if not reference:
-                    logger.error("Property data missing reference")
                     return False
                 
                 with transaction.atomic():
@@ -128,17 +106,14 @@ class BotIntegrationService:
                             if hasattr(existing_property, field) and value is not None:
                                 setattr(existing_property, field, value)
                         existing_property.save()
-                        logger.info(f"Updated property: {reference}")
                         return True
                     except Property.DoesNotExist:
                         # Create new property
                         new_property = Property(**mapped_data)
                         new_property.save()
-                        logger.info(f"Created property: {reference}")
                         return True
                         
             except Exception as e:
-                logger.error(f"Error uploading property via ORM: {e}")
                 return False
         
         # Fallback to HTTP API for external usage
@@ -161,10 +136,8 @@ class BotIntegrationService:
                     )
                     
                     if update_response.status_code == 200:
-                        logger.info(f"Updated property: {reference}")
                         return True
                     else:
-                        logger.error(f"Failed to update property: {reference}")
                         return False
                 else:
                     create_response = self.session.post(
@@ -174,17 +147,13 @@ class BotIntegrationService:
                     )
                     
                     if create_response.status_code in [200, 201]:
-                        logger.info(f"Created property: {reference}")
                         return True
                     else:
-                        logger.error(f"Failed to create property: {reference}")
                         return False
             else:
-                logger.error("Property data missing reference")
                 return False
                 
         except Exception as e:
-            logger.error(f"Error uploading property: {e}")
             return False
     
     def _map_scraper_data_to_model(self, property_data):
@@ -320,11 +289,9 @@ class BotIntegrationService:
             if 'link' not in mapped_data:
                 mapped_data['link'] = "#"
             
-            logger.info(f"Mapped property data: {mapped_data}")
             return mapped_data
             
         except Exception as e:
-            logger.error(f"Error mapping property data: {e}")
             # Return minimal required data
             return {
                 'reference': f"scraper_{hash(str(property_data))}",
@@ -346,28 +313,23 @@ class BotIntegrationService:
             scraper_file_path = os.path.join(self.bot_dir, 'scrapers', f"{scraper_name}.py")
             
             if not os.path.exists(scraper_file_path):
-                logger.error(f"Scraper file not found: {scraper_file_path}")
                 return None
             
             # Load the module from the file path
             spec = importlib.util.spec_from_file_location(scraper_name, scraper_file_path)
             if spec is None:
-                logger.error(f"Failed to create spec for {scraper_name}")
                 return None
             
             module = importlib.util.module_from_spec(spec)
             if module is None:
-                logger.error(f"Failed to create module for {scraper_name}")
                 return None
             
             # Execute the module
             spec.loader.exec_module(module)
             
-            logger.info(f"Successfully imported scraper module: {scraper_name}")
             return module
             
         except Exception as e:
-            logger.error(f"Error importing scraper module {scraper_name}: {e}")
             return None
     
     def get_available_scrapers(self):
@@ -388,7 +350,6 @@ class BotIntegrationService:
             return scrapers
             
         except Exception as e:
-            logger.error(f"Error getting scrapers: {e}")
             return []
     
     def run_scraper(self, scraper_name, upload_to_django=True, limit_properties=10):
@@ -413,22 +374,12 @@ class BotIntegrationService:
                     uploaded = 0
                     updated = 0
                     
-                    logger.info(f"Starting to upload {len(result['properties'])} properties from {scraper_name}")
-                    
                     for i, property_data in enumerate(result['properties']):
-                        logger.info(f"Processing property {i+1}/{len(result['properties'])}: {property_data.get('title', 'No title')}")
-                        
                         if self.upload_property(property_data):
                             if property_data.get('reference') or property_data.get('Property ID'):
                                 updated += 1
-                                logger.info(f"Updated property {i+1}")
                             else:
                                 uploaded += 1
-                                logger.info(f"Uploaded new property {i+1}")
-                        else:
-                            logger.error(f"Failed to upload property {i+1}")
-                    
-                    logger.info(f"Upload complete: {uploaded} new, {updated} updated")
                     
                     return {
                         "success": True,
@@ -447,37 +398,24 @@ class BotIntegrationService:
                     }
             else:
                 # Handle scrapers that don't have run_scraper method but execute main logic
-                logger.info(f"Scraper {scraper_name} has no run_scraper method, checking for homesData")
                 
                 # Check if the module has homesData (the scraped properties)
                 if hasattr(scraper_module, 'homesData'):
                     properties = scraper_module.homesData
-                    logger.info(f"Found {len(properties)} properties in homesData")
                     
                     if limit_properties and len(properties) > limit_properties:
                         properties = properties[:limit_properties]
-                        logger.info(f"Limited to {limit_properties} properties")
                     
                     if upload_to_django and properties:
                         uploaded = 0
                         updated = 0
                         
-                        logger.info(f"Starting to upload {len(properties)} properties from {scraper_name}")
-                        
                         for i, property_data in enumerate(properties):
-                            logger.info(f"Processing property {i+1}/{len(properties)}: {property_data.get('title', 'No title')}")
-                            
                             if self.upload_property(property_data):
                                 if property_data.get('reference') or property_data.get('Property ID'):
                                     updated += 1
-                                    logger.info(f"Updated property {i+1}")
                                 else:
                                     uploaded += 1
-                                    logger.info(f"Uploaded new property {i+1}")
-                            else:
-                                logger.error(f"Failed to upload property {i+1}")
-                        
-                        logger.info(f"Upload complete: {uploaded} new, {updated} updated")
                         
                         return {
                             "success": True,
@@ -498,7 +436,6 @@ class BotIntegrationService:
                     return {"success": False, "error": f"Scraper {scraper_name} has no run_scraper method or homesData"}
                 
         except Exception as e:
-            logger.error(f"Error running scraper {scraper_name}: {e}")
             return {"success": False, "error": str(e)}
     
     def run_all_scrapers(self, upload_to_django=True, limit_properties=10):
@@ -534,5 +471,4 @@ class BotIntegrationService:
             }
             
         except Exception as e:
-            logger.error(f"Error running all scrapers: {e}")
             return {"success": False, "error": str(e)}
