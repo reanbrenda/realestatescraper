@@ -2,7 +2,7 @@
 
 This document provides comprehensive coverage of all API endpoints in the Real Estate Scraper API, including request/response formats, authentication requirements, and usage examples.
 
-## 🔐 Authentication
+## Authentication
 
 All API endpoints (except login/register) require JWT authentication via the `Authorization` header:
 
@@ -11,10 +11,10 @@ Authorization: Bearer <your-jwt-token>
 ```
 
 ### JWT Token Lifetime
-- **Access Token**: 24 hours
-- **Refresh Token**: 7 days
+- Access Token: 24 hours
+- Refresh Token: 7 days
 
-## 🏠 Property Management API
+## Property Management API
 
 ### 1. Property CRUD Operations
 
@@ -117,7 +117,7 @@ curl "http://localhost:8000/api/properties/?ordering=-price"
 - **Description**: Get list of all unique regions
 - **Authentication**: Required
 
-## 🤖 Bot Control API (Admin Only)
+## Bot Control API (Admin Only)
 
 ### 1. Bot Scraper Management
 
@@ -192,7 +192,7 @@ curl "http://localhost:8000/api/properties/?ordering=-price"
 }
 ```
 
-## 📊 Data Export API
+## Data Export API
 
 ### 1. Export Formats
 
@@ -244,7 +244,7 @@ curl "http://localhost:8000/api/properties/?ordering=-price"
 }
 ```
 
-## 👥 User Authentication API
+## User Authentication API
 
 ### 1. Authentication Endpoints
 
@@ -288,7 +288,7 @@ curl "http://localhost:8000/api/properties/?ordering=-price"
   - Password validation
   - Admin approval system
 
-## 🔍 Advanced Features
+## Advanced Features
 
 ### 1. Search and Filtering
 
@@ -347,7 +347,7 @@ curl "http://localhost:8000/api/properties/?ordering=-price"
 - energy_rating: Energy efficiency rating
 - And many more...
 
-## 📈 Response Formats
+## Response Formats
 
 ### 1. Success Responses
 
@@ -394,7 +394,7 @@ curl "http://localhost:8000/api/properties/?ordering=-price"
 }
 ```
 
-## 🚀 Performance Considerations
+## Performance Considerations
 
 ### 1. Database Optimization
 - Indexed fields for common queries
@@ -412,7 +412,7 @@ curl "http://localhost:8000/api/properties/?ordering=-price"
 - API endpoint throttling
 - Bot protection mechanisms
 
-## 🔒 Security Features
+## Security Features
 
 ### 1. Authentication & Authorization
 - JWT-based authentication
@@ -432,7 +432,7 @@ curl "http://localhost:8000/api/properties/?ordering=-price"
 - File upload restrictions
 - Secure headers
 
-## 📚 API Documentation
+## API Documentation
 
 ### 1. Interactive Documentation
 - **Swagger UI**: `/api/docs/`

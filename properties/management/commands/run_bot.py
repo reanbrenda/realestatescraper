@@ -53,7 +53,7 @@ class Command(BaseCommand):
                         f'Make sure the real-estate-scraper-bot directory exists and contains scrapers/'
                     )
                 else:
-                    self.stdout.write(f'✅ Bot directory found at: {bot_service.bot_dir}')
+                    self.stdout.write(f'Bot directory found at: {bot_service.bot_dir}')
             
             # Set environment variables for the bot
             os.environ.setdefault('API_URL', 'http://localhost:8000/api')
@@ -64,7 +64,7 @@ class Command(BaseCommand):
             try:
                 # Import the specific scraper
                 scraper_module = __import__(f'scrapers.{scraper_name}', fromlist=[''])
-                self.stdout.write(f'✅ Successfully imported {scraper_name}')
+                self.stdout.write(f'Successfully imported {scraper_name}')
                 
                 # Import upload functionality
                 import sys
@@ -77,9 +77,9 @@ class Command(BaseCommand):
                 
                 try:
                     from upload import transform_property_data, upload_json_data
-                    self.stdout.write('✅ Successfully imported upload functionality')
+                    self.stdout.write('Successfully imported upload functionality')
                 except ImportError:
-                    self.stdout.write('⚠️  Could not import upload functionality, using fallback')
+                    self.stdout.write('Could not import upload functionality, using fallback')
                     transform_property_data = None
                     upload_json_data = None
                 
@@ -87,12 +87,12 @@ class Command(BaseCommand):
                 raise CommandError(f'Failed to import bot modules: {e}')
             
             # Run the scraper
-            self.stdout.write('🚀 Running scraper...')
+            self.stdout.write('Running scraper...')
             
             if hasattr(scraper_module, 'main'):
                 # Run the scraper's main function
                 scraped_data = scraper_module.main()
-                self.stdout.write(f'✅ Scraped {len(scraped_data)} properties')
+                self.stdout.write(f'Scraped {len(scraped_data)} properties')
             else:
                 # Try to find scraped data in the module
                 scraped_data = getattr(scraper_module, 'allHomeDetails', [])
@@ -106,24 +106,24 @@ class Command(BaseCommand):
                                 break
                 
                 if scraped_data:
-                    self.stdout.write(f'✅ Found {len(scraped_data)} URLs in {scraper_name}')
+                    self.stdout.write(f'Found {len(scraped_data)} URLs in {scraper_name}')
                     
                     # Check if we have URLs that need to be processed
                     if scraped_data and isinstance(scraped_data[0], str) and scraped_data[0].startswith('http'):
-                        self.stdout.write('🔍 Processing URLs to extract property data...')
+                        self.stdout.write('Processing URLs to extract property data...')
                         
                         # Import the Home class to process URLs - use the correct one for this scraper
                         try:
                             # Try to import Home from the same scraper module
                             Home = getattr(scraper_module, 'Home')
-                            self.stdout.write(f'✅ Using Home class from {scraper_name}')
+                            self.stdout.write(f'Using Home class from {scraper_name}')
                         except AttributeError:
                             # Fallback to test_scraping1 if Home not found
                             try:
                                 from scrapers.test_scraping1 import Home
-                                self.stdout.write(f'⚠️  Using fallback Home class from test_scraping1')
+                                self.stdout.write(f'Using fallback Home class from test_scraping1')
                             except ImportError:
-                                self.stdout.write(f'❌ Could not import fallback Home class')
+                                self.stdout.write(f'Could not import fallback Home class')
                                 raise CommandError(f'Home class not found in {scraper_name} and fallback failed')
                         
                         # Process each URL to get property data
@@ -134,15 +134,15 @@ class Command(BaseCommand):
                                 home = Home(url)
                                 property_data = home.getAll()
                                 processed_data.append(property_data)
-                                self.stdout.write(f'    ✅ Extracted: {property_data.get("title", "Unknown")}')
+                                self.stdout.write(f'    Extracted: {property_data.get("title", "Unknown")}')
                             except Exception as e:
-                                self.stdout.write(f'    ❌ Failed: {str(e)[:100]}...')
+                                self.stdout.write(f'    Failed: {str(e)[:100]}...')
                                 continue
                         
                         scraped_data = processed_data
-                        self.stdout.write(f'✅ Successfully processed {len(scraped_data)} properties')
+                        self.stdout.write(f'Successfully processed {len(scraped_data)} properties')
                     else:
-                        self.stdout.write(f'✅ Found {len(scraped_data)} properties in {scraper_name}')
+                        self.stdout.write(f'Found {len(scraped_data)} properties in {scraper_name}')
                 else:
                     raise CommandError(f'No scraped data found in {scraper_name}')
             
@@ -166,7 +166,7 @@ class Command(BaseCommand):
             
             # Upload to Django if requested
             if upload and not dry_run:
-                self.stdout.write('📤 Uploading properties to Django...')
+                self.stdout.write('Uploading properties to Django...')
                 
                 # Create a session and authenticate
                 import requests
@@ -186,7 +186,7 @@ class Command(BaseCommand):
                     token_data = login_response.json()
                     access_token = token_data.get('access')
                     session.headers.update({"Authorization": f"Bearer {access_token}"})
-                    self.stdout.write('✅ Authenticated with Django API')
+                    self.stdout.write('Authenticated with Django API')
                 else:
                     raise CommandError(f'Failed to authenticate: {login_response.status_code}')
                 
@@ -206,13 +206,13 @@ class Command(BaseCommand):
                         
                         if response.status_code in [200, 201]:
                             uploaded_count += 1
-                            self.stdout.write(f'  ✅ Uploaded: {transformed_property.get("title", "Unknown")}')
+                            self.stdout.write(f'   Uploaded: {transformed_property.get("title", "Unknown")}')
                         else:
-                            self.stdout.write(f'  ❌ Failed: {transformed_property.get("title", "Unknown")} - {response.status_code}')
+                            self.stdout.write(f'   Failed: {transformed_property.get("title", "Unknown")} - {response.status_code}')
                             
                     except Exception as e:
                         self.stdout.write(
-                            self.style.ERROR(f'  ❌ Error uploading property: {e}')
+                            self.style.ERROR(f'   Error uploading property: {e}')
                         )
                         continue
                 

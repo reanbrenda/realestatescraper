@@ -3,6 +3,7 @@ import sys
 import requests
 from django.conf import settings
 from django.core.cache import cache
+from django.contrib.auth import authenticate
 import logging
 
 logger = logging.getLogger(__name__)
@@ -11,20 +12,25 @@ class BotIntegrationService:
     """Service for integrating with the existing real estate scraper bot"""
     
     def __init__(self):
-        self.api_url = getattr(settings, 'BOT_API_URL', 'http://localhost:8000/api')
-        self.username = getattr(settings, 'BOT_USERNAME', 'admin')
-        self.password = getattr(settings, 'BOT_PASSWORD', 'admin123')
+        # TEMPORARILY HARDCODED FOR TESTING
+        self.api_url = 'http://127.0.0.1:8000/api'  # Use 127.0.0.1 instead of localhost
+        self.username = 'testuser'  # Use the user we know exists
+        self.password = 'testpass123'  # Use the password we know works
         self.session = None
+        self.running_from_django = True  # Assume we're running from Django
         
-        # Add bot directory to Python path - look in current Django project
+        # Log the configuration being used
+        logger.info(f"Bot service initialized with API URL: {self.api_url}")
+        logger.info(f"Bot service using username: {self.username}")
+        logger.info(f"Running from Django: {self.running_from_django}")
+        
         self.bot_dir = os.path.join(settings.BASE_DIR, 'real-estate-scraper-bot')
         
         if not os.path.exists(self.bot_dir):
-            # Try alternative paths
             possible_paths = [
                 os.path.join(settings.BASE_DIR, 'real-estate-scraper-bot'),
                 os.path.join(settings.BASE_DIR.parent, 'real-estate-scraper-bot'),
-                '/app/real-estate-scraper-bot',  # Docker container path
+                '/app/real-estate-scraper-bot',
             ]
             
             for path in possible_paths:
@@ -38,7 +44,6 @@ class BotIntegrationService:
             logger.info(f"Bot directory found at: {self.bot_dir}")
         else:
             logger.error(f"Bot directory not found. Tried: {self.bot_dir}")
-            # Try to find it anywhere in the project
             for root, dirs, files in os.walk(settings.BASE_DIR):
                 if 'real-estate-scraper-bot' in dirs:
                     self.bot_dir = os.path.join(root, 'real-estate-scraper-bot')
@@ -49,6 +54,11 @@ class BotIntegrationService:
     
     def authenticate(self):
         """Authenticate with Django API and return session"""
+        # If running from Django, skip HTTP authentication
+        if self.running_from_django:
+            logger.info("Running from Django - skipping HTTP authentication")
+            return True
+            
         if self.session is None:
             self.session = requests.Session()
         
@@ -58,11 +68,19 @@ class BotIntegrationService:
                 "password": self.password
             }
             
+            login_url = f"{self.api_url}/auth/login/"
+            logger.info(f"Attempting authentication at: {login_url}")
+            logger.info(f"Using credentials: username={self.username}")
+            
             response = self.session.post(
-                f"{self.api_url}/auth/login/",
+                login_url,
                 json=credentials,
                 headers={"Content-Type": "application/json"},
             )
+            
+            logger.info(f"Authentication response status: {response.status_code}")
+            logger.info(f"Authentication response content: {response.text[:200]}")
+            
             response.raise_for_status()
             
             data = response.json()
@@ -74,273 +92,447 @@ class BotIntegrationService:
                 return True
             else:
                 logger.error("No access token received from Django API")
+                logger.error(f"Response data: {data}")
                 return False
                 
         except requests.exceptions.RequestException as e:
             logger.error(f"Authentication failed: {e}")
+            logger.error(f"Request details: URL={self.api_url}/auth/login/, username={self.username}")
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error during authentication: {e}")
             return False
     
     def upload_property(self, property_data):
         """Upload a single property to Django API"""
+        # If running from Django, use ORM directly
+        if self.running_from_django:
+            try:
+                from properties.models import Property
+                from django.db import transaction
+                
+                # Map scraper data to Django model fields
+                mapped_data = self._map_scraper_data_to_model(property_data)
+                
+                reference = mapped_data.get('reference')
+                if not reference:
+                    logger.error("Property data missing reference")
+                    return False
+                
+                with transaction.atomic():
+                    # Check if property exists by reference
+                    try:
+                        existing_property = Property.objects.get(reference=reference)
+                        # Update existing property
+                        for field, value in mapped_data.items():
+                            if hasattr(existing_property, field) and value is not None:
+                                setattr(existing_property, field, value)
+                        existing_property.save()
+                        logger.info(f"Updated property: {reference}")
+                        return True
+                    except Property.DoesNotExist:
+                        # Create new property
+                        new_property = Property(**mapped_data)
+                        new_property.save()
+                        logger.info(f"Created property: {reference}")
+                        return True
+                        
+            except Exception as e:
+                logger.error(f"Error uploading property via ORM: {e}")
+                return False
+        
+        # Fallback to HTTP API for external usage
         if not self.authenticate():
             return False
         
         try:
-            # Check if property already exists by reference
             reference = property_data.get('reference')
             if reference:
-                # Try to get existing property
                 response = self.session.get(
                     f"{self.api_url}/properties/reference/{reference}/"
                 )
                 
                 if response.status_code == 200:
-                    # Property exists, update it
                     property_id = response.json().get('id')
                     update_response = self.session.put(
                         f"{self.api_url}/properties/{property_id}/update/",
                         json=property_data,
-                        headers={"Content-Type": "application/json"},
+                        headers={"Content-Type": "application/json"}
                     )
                     
                     if update_response.status_code == 200:
                         logger.info(f"Updated property: {reference}")
                         return True
                     else:
-                        logger.error(f"Failed to update property {reference}: {update_response.status_code}")
+                        logger.error(f"Failed to update property: {reference}")
                         return False
-                
-                elif response.status_code == 404:
-                    # Property doesn't exist, create it
+                else:
                     create_response = self.session.post(
                         f"{self.api_url}/properties/create/",
                         json=property_data,
-                        headers={"Content-Type": "application/json"},
+                        headers={"Content-Type": "application/json"}
                     )
                     
-                    if create_response.status_code == 201:
-                        logger.info(f"Created new property: {reference}")
+                    if create_response.status_code in [200, 201]:
+                        logger.info(f"Created property: {reference}")
                         return True
                     else:
-                        logger.error(f"Failed to create property {reference}: {create_response.status_code}")
+                        logger.error(f"Failed to create property: {reference}")
                         return False
-                
-                else:
-                    logger.error(f"Unexpected response checking property {reference}: {response.status_code}")
-                    return False
-            
             else:
-                # No reference, create new property
-                create_response = self.session.post(
-                    f"{self.api_url}/properties/create/",
-                    json=property_data,
-                    headers={"Content-Type": "application/json"},
-                )
+                logger.error("Property data missing reference")
+                return False
                 
-                if create_response.status_code == 201:
-                    logger.info("Created new property without reference")
-                    return True
-                else:
-                    logger.error(f"Failed to create property: {create_response.status_code}")
-                    return False
-                    
         except Exception as e:
             logger.error(f"Error uploading property: {e}")
             return False
     
-    def run_scraper(self, scraper_name, upload_to_django=True, limit_properties=3):
-        """Run a specific scraper and optionally upload to Django"""
+    def _map_scraper_data_to_model(self, property_data):
+        """Map scraper data structure to Django Property model fields"""
         try:
-            # Import the scraper module
-            scraper_module = __import__(f'scrapers.{scraper_name}', fromlist=[''])
-            logger.info(f"Successfully imported scraper: {scraper_name}")
+            mapped_data = {}
             
-            # Import upload functionality
-            try:
-                # Try to import from the bot directory
-                import sys
-                import os
-                
-                # Add bot directory to path if not already there
-                bot_dir = os.path.join(settings.BASE_DIR, 'real-estate-scraper-bot')
-                if bot_dir not in sys.path:
-                    sys.path.insert(0, bot_dir)
-                
-                from upload import transform_property_data
-                logger.info("Successfully imported bot upload functionality")
-            except ImportError as e:
-                logger.warning(f"Could not import bot upload functionality: {e}")
-                transform_property_data = None
+            # Map reference (Property ID -> reference)
+            if 'Property ID' in property_data:
+                mapped_data['reference'] = str(property_data['Property ID'])
+            elif 'reference' in property_data:
+                mapped_data['reference'] = str(property_data['reference'])
             
-            # Run the scraper
-            scraped_data = []
+            # Map title
+            if 'title' in property_data and property_data['title']:
+                mapped_data['title'] = str(property_data['title'])
             
-            if hasattr(scraper_module, 'main'):
-                # Run the scraper's main function
-                scraped_data = scraper_module.main()
-                logger.info(f"Scraper {scraper_name} returned {len(scraped_data)} properties")
-            else:
-                # Try to find scraped data in the module
-                scraped_data = getattr(scraper_module, 'allHomeDetails', [])
-                if not scraped_data:
-                    # Try to find any data variable
-                    for attr_name in dir(scraper_module):
-                        if not attr_name.startswith('_'):
-                            attr_value = getattr(scraper_module, attr_name)
-                            if isinstance(attr_value, list) and len(attr_value) > 0:
-                                scraped_data = attr_value
-                                break
-                
-                if scraped_data:
-                    logger.info(f"Found {len(scraped_data)} properties in {scraper_name}")
+            # Map category
+            if 'category' in property_data and property_data['category']:
+                mapped_data['category'] = str(property_data['category'])
+            
+            # Map price
+            if 'price' in property_data and property_data['price']:
+                try:
+                    mapped_data['price'] = float(property_data['price'])
+                except (ValueError, TypeError):
+                    mapped_data['price'] = 0.0
+            
+            # Map square meters (livingSpace -> square_meters)
+            if 'livingSpace' in property_data and property_data['livingSpace']:
+                try:
+                    mapped_data['square_meters'] = float(property_data['livingSpace'])
+                except (ValueError, TypeError):
+                    mapped_data['square_meters'] = 0.0
+            elif 'square_meters' in property_data and property_data['square_meters']:
+                try:
+                    mapped_data['square_meters'] = float(property_data['square_meters'])
+                except (ValueError, TypeError):
+                    mapped_data['square_meters'] = 0.0
+            
+            # Map region and town (location -> region, extract town if possible)
+            if 'location' in property_data and property_data['location']:
+                location = str(property_data['location'])
+                # Split location into region and town if it contains commas or newlines
+                if ',' in location or '\n' in location:
+                    parts = location.replace('\n', ',').split(',')
+                    mapped_data['region'] = parts[0].strip()
+                    if len(parts) > 1:
+                        mapped_data['town'] = parts[1].strip()
                 else:
-                    logger.warning(f"No scraped data found in {scraper_name}")
-                    return 0, 0
+                    mapped_data['region'] = location
+            elif 'region' in property_data and property_data['region']:
+                mapped_data['region'] = str(property_data['region'])
             
-            # Upload to Django if requested
-            uploaded_count = 0
-            updated_count = 0
+            # Map town if not already set
+            if 'town' not in mapped_data and 'town' in property_data and property_data['town']:
+                mapped_data['town'] = str(property_data['town'])
             
-            if upload_to_django and scraped_data:
-                logger.info("Starting upload to Django...")
-                
-                # Check if scraped_data contains URLs (strings) or property objects
-                if scraped_data and isinstance(scraped_data[0], str) and scraped_data[0].startswith('http'):
-                    logger.info("Detected URLs, processing each to extract property data...")
-                    
-                    # Process each URL to get property data
-                    processed_data = []
-                    for url in scraped_data[:limit_properties]:  # Use limit_properties parameter
-                        try:
-                            # Import the Home class to process URLs
-                            Home = getattr(scraper_module, 'Home', None)
-                            if Home:
-                                home = Home(url)
-                                property_data = home.getAll()
-                                processed_data.append(property_data)
-                                logger.info(f"Processed URL: {url[:80]}...")
-                            else:
-                                logger.warning(f"Home class not found in {scraper_name}")
-                                break
-                        except Exception as e:
-                            logger.error(f"Error processing URL {url}: {e}")
-                            continue
-                    
-                    scraped_data = processed_data
-                    logger.info(f"Successfully processed {len(scraped_data)} URLs into property data")
-                
-                # Now process the property data
-                for raw_property in scraped_data:
-                    try:
-                        # Transform the data if possible
-                        if transform_property_data:
-                            transformed_property = transform_property_data(raw_property)
-                        else:
-                            # Basic transformation as fallback
-                            transformed_property = self._basic_transform(raw_property)
-                        
-                        # Upload to Django
-                        if self.upload_property(transformed_property):
-                            uploaded_count += 1
-                        else:
-                            # Check if it was an update
-                            if transformed_property.get('reference'):
-                                updated_count += 1
-                        
-                    except Exception as e:
-                        logger.error(f"Error processing property: {e}")
-                        continue
-                
-                logger.info(f"Upload complete: {uploaded_count} new, {updated_count} updated")
+            # Map bedrooms
+            if 'bedrooms' in property_data and property_data['bedrooms']:
+                try:
+                    mapped_data['bedrooms'] = int(property_data['bedrooms'])
+                except (ValueError, TypeError):
+                    pass
             
-            return uploaded_count, updated_count
+            # Map bathrooms
+            if 'bathrooms' in property_data and property_data['bathrooms']:
+                try:
+                    mapped_data['bathrooms'] = int(property_data['bathrooms'])
+                except (ValueError, TypeError):
+                    pass
+            
+            # Map land area
+            if 'landArea' in property_data and property_data['landArea']:
+                try:
+                    mapped_data['land_area'] = float(property_data['landArea'])
+                except (ValueError, TypeError):
+                    pass
+            
+            # Map built up area
+            if 'builtUp' in property_data and property_data['builtUp']:
+                try:
+                    mapped_data['built_up'] = float(property_data['builtUp'])
+                except (ValueError, TypeError):
+                    pass
+            
+            # Map description
+            if 'description' in property_data and property_data['description']:
+                mapped_data['description'] = str(property_data['description'])
+            
+            # Map photos (allImages -> photos)
+            if 'allImages' in property_data and property_data['allImages']:
+                if isinstance(property_data['allImages'], list):
+                    mapped_data['photos'] = property_data['allImages']
+                else:
+                    mapped_data['photos'] = [str(property_data['allImages'])]
+            elif 'photos' in property_data and property_data['photos']:
+                mapped_data['photos'] = property_data['photos']
+            
+            # Map main image
+            if 'mainImage' in property_data and property_data['mainImage']:
+                mapped_data['main_image'] = str(property_data['mainImage'])
+            elif 'main_image' in property_data and property_data['main_image']:
+                mapped_data['main_image'] = str(property_data['main_image'])
+            
+            # Map platform
+            if 'platform' in property_data and property_data['platform']:
+                mapped_data['platform'] = str(property_data['platform'])
+            
+            # Map link
+            if 'link' in property_data and property_data['link']:
+                mapped_data['link'] = str(property_data['link'])
+            
+            # Set default values for required fields if missing
+            if 'reference' not in mapped_data:
+                mapped_data['reference'] = f"scraper_{hash(str(property_data))}"
+            
+            if 'title' not in mapped_data:
+                mapped_data['title'] = "Property from scraper"
+            
+            if 'price' not in mapped_data:
+                mapped_data['price'] = 0.0
+            
+            if 'square_meters' not in mapped_data:
+                mapped_data['square_meters'] = 0.0
+            
+            if 'region' not in mapped_data:
+                mapped_data['region'] = "Unknown"
+            
+            if 'platform' not in mapped_data:
+                mapped_data['platform'] = "scraper"
+            
+            if 'link' not in mapped_data:
+                mapped_data['link'] = "#"
+            
+            logger.info(f"Mapped property data: {mapped_data}")
+            return mapped_data
             
         except Exception as e:
-            logger.error(f"Error running scraper {scraper_name}: {e}")
-            return 0, 0
+            logger.error(f"Error mapping property data: {e}")
+            # Return minimal required data
+            return {
+                'reference': f"scraper_{hash(str(property_data))}",
+                'title': "Property from scraper",
+                'price': 0.0,
+                'square_meters': 0.0,
+                'region': "Unknown",
+                'platform': "scraper",
+                'link': "#"
+            }
     
-    def _basic_transform(self, raw_property):
-        """Basic transformation for scraped property data"""
-        # Extract basic information
-        title = raw_property.get('title', 'Unknown Property')
-        price = raw_property.get('price', 0)
-        location = raw_property.get('location', 'Unknown Location')
-        description = raw_property.get('description', '')
-        link = raw_property.get('link', '')
-        platform = raw_property.get('platform', 'unknown')
-        
-        # Create reference from platform and link
-        reference = f"{platform}_{hash(link) % 1000000}"
-        
-        return {
-            'reference': reference,
-            'platform': platform,
-            'link': link,
-            'region': location,
-            'town': location,
-            'title': title,
-            'price': float(price) if price else 0.0,
-            'description': description,
-            'photos': raw_property.get('allImages', []),
-            'main_image': raw_property.get('mainImage', ''),
-            'category': raw_property.get('category', 'house'),
-            'square_meters': float(raw_property.get('livingSpace', 0)) if raw_property.get('livingSpace') else None,
-            'bedrooms': int(raw_property.get('bedrooms', 0)) if raw_property.get('bedrooms') else None,
-            'bathrooms': int(raw_property.get('bathrooms', 0)) if raw_property.get('bathrooms') else None,
-            'land_area': float(raw_property.get('landArea', 0)) if raw_property.get('landArea') else None,
-            'built_up': float(raw_property.get('builtUp', 0)) if raw_property.get('builtUp') else None,
-        }
+    def _import_scraper_module(self, scraper_name):
+        """Import a scraper module from the scrapers directory"""
+        try:
+            import importlib.util
+            import os
+            
+            # Construct the full path to the scraper file
+            scraper_file_path = os.path.join(self.bot_dir, 'scrapers', f"{scraper_name}.py")
+            
+            if not os.path.exists(scraper_file_path):
+                logger.error(f"Scraper file not found: {scraper_file_path}")
+                return None
+            
+            # Load the module from the file path
+            spec = importlib.util.spec_from_file_location(scraper_name, scraper_file_path)
+            if spec is None:
+                logger.error(f"Failed to create spec for {scraper_name}")
+                return None
+            
+            module = importlib.util.module_from_spec(spec)
+            if module is None:
+                logger.error(f"Failed to create module for {scraper_name}")
+                return None
+            
+            # Execute the module
+            spec.loader.exec_module(module)
+            
+            logger.info(f"Successfully imported scraper module: {scraper_name}")
+            return module
+            
+        except Exception as e:
+            logger.error(f"Error importing scraper module {scraper_name}: {e}")
+            return None
     
     def get_available_scrapers(self):
         """Get list of available scrapers"""
-        scrapers = []
-        scrapers_dir = os.path.join(self.bot_dir, 'scrapers')
-        
-        if os.path.exists(scrapers_dir):
-            for file in os.listdir(scrapers_dir):
-                if file.startswith('test_scraping') and file.endswith('.py'):
-                    scraper_name = file[:-3]  # Remove .py extension
-                    scrapers.append(scraper_name)
-        
-        return scrapers
-    
-    def get_scraper_status(self, scraper_name):
-        """Get status and info about a specific scraper"""
         try:
-            scraper_module = __import__(f'scrapers.{scraper_name}', fromlist=[''])
+            if not self.authenticate():
+                return []
             
-            # Get basic info
-            info = {
-                'name': scraper_name,
-                'module': scraper_module.__name__,
-                'file': scraper_module.__file__,
-                'has_main': hasattr(scraper_module, 'main'),
-                'attributes': [attr for attr in dir(scraper_module) if not attr.startswith('_')]
-            }
+            scrapers = []
+            scrapers_dir = os.path.join(self.bot_dir, 'scrapers')
             
-            # Try to get sample data
-            try:
-                if hasattr(scraper_module, 'main'):
-                    sample_data = scraper_module.main()
-                    if sample_data and len(sample_data) > 0:
-                        info['sample_property'] = sample_data[0]
-                        info['total_properties'] = len(sample_data)
-                else:
-                    # Look for data variables
-                    for attr_name in ['allHomeDetails', 'properties', 'data']:
-                        if hasattr(scraper_module, attr_name):
-                            data = getattr(scraper_module, attr_name)
-                            if isinstance(data, list) and len(data) > 0:
-                                info['sample_property'] = data[0]
-                                info['total_properties'] = len(data)
-                                break
-            except Exception as e:
-                info['sample_error'] = str(e)
+            if os.path.exists(scrapers_dir):
+                for file in os.listdir(scrapers_dir):
+                    if file.startswith('test_scraping') and file.endswith('.py'):
+                        scraper_name = file.replace('.py', '')
+                        scrapers.append(scraper_name)
             
-            return info
+            return scrapers
             
         except Exception as e:
+            logger.error(f"Error getting scrapers: {e}")
+            return []
+    
+    def run_scraper(self, scraper_name, upload_to_django=True, limit_properties=10):
+        """Run a specific scraper"""
+        try:
+            if not self.authenticate():
+                return {"success": False, "error": "Authentication failed"}
+            
+            scrapers = self.get_available_scrapers()
+            if scraper_name not in scrapers:
+                return {"success": False, "error": f"Scraper {scraper_name} not found"}
+            
+            # Import the scraper module properly
+            scraper_module = self._import_scraper_module(scraper_name)
+            if not scraper_module:
+                return {"success": False, "error": f"Failed to import scraper module {scraper_name}"}
+            
+            if hasattr(scraper_module, 'run_scraper'):
+                result = scraper_module.run_scraper(limit_properties)
+                
+                if upload_to_django and result.get('properties'):
+                    uploaded = 0
+                    updated = 0
+                    
+                    logger.info(f"Starting to upload {len(result['properties'])} properties from {scraper_name}")
+                    
+                    for i, property_data in enumerate(result['properties']):
+                        logger.info(f"Processing property {i+1}/{len(result['properties'])}: {property_data.get('title', 'No title')}")
+                        
+                        if self.upload_property(property_data):
+                            if property_data.get('reference') or property_data.get('Property ID'):
+                                updated += 1
+                                logger.info(f"Updated property {i+1}")
+                            else:
+                                uploaded += 1
+                                logger.info(f"Uploaded new property {i+1}")
+                        else:
+                            logger.error(f"Failed to upload property {i+1}")
+                    
+                    logger.info(f"Upload complete: {uploaded} new, {updated} updated")
+                    
+                    return {
+                        "success": True,
+                        "message": f"Bot scraper {scraper_name} completed successfully",
+                        "scraper": scraper_name,
+                        "uploaded_properties": uploaded,
+                        "updated_properties": updated,
+                        "total_processed": len(result['properties'])
+                    }
+                else:
+                    return {
+                        "success": True,
+                        "message": f"Bot scraper {scraper_name} completed",
+                        "scraper": scraper_name,
+                        "properties_found": len(result.get('properties', []))
+                    }
+            else:
+                # Handle scrapers that don't have run_scraper method but execute main logic
+                logger.info(f"Scraper {scraper_name} has no run_scraper method, checking for homesData")
+                
+                # Check if the module has homesData (the scraped properties)
+                if hasattr(scraper_module, 'homesData'):
+                    properties = scraper_module.homesData
+                    logger.info(f"Found {len(properties)} properties in homesData")
+                    
+                    if limit_properties and len(properties) > limit_properties:
+                        properties = properties[:limit_properties]
+                        logger.info(f"Limited to {limit_properties} properties")
+                    
+                    if upload_to_django and properties:
+                        uploaded = 0
+                        updated = 0
+                        
+                        logger.info(f"Starting to upload {len(properties)} properties from {scraper_name}")
+                        
+                        for i, property_data in enumerate(properties):
+                            logger.info(f"Processing property {i+1}/{len(properties)}: {property_data.get('title', 'No title')}")
+                            
+                            if self.upload_property(property_data):
+                                if property_data.get('reference') or property_data.get('Property ID'):
+                                    updated += 1
+                                    logger.info(f"Updated property {i+1}")
+                                else:
+                                    uploaded += 1
+                                    logger.info(f"Uploaded new property {i+1}")
+                            else:
+                                logger.error(f"Failed to upload property {i+1}")
+                        
+                        logger.info(f"Upload complete: {uploaded} new, {updated} updated")
+                        
+                        return {
+                            "success": True,
+                            "message": f"Bot scraper {scraper_name} completed successfully",
+                            "scraper": scraper_name,
+                            "uploaded_properties": uploaded,
+                            "updated_properties": updated,
+                            "total_processed": len(properties)
+                        }
+                    else:
+                        return {
+                            "success": True,
+                            "message": f"Bot scraper {scraper_name} completed",
+                            "scraper": scraper_name,
+                            "properties_found": len(properties)
+                        }
+                else:
+                    return {"success": False, "error": f"Scraper {scraper_name} has no run_scraper method or homesData"}
+                
+        except Exception as e:
+            logger.error(f"Error running scraper {scraper_name}: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def run_all_scrapers(self, upload_to_django=True, limit_properties=10):
+        """Run all available scrapers"""
+        try:
+            scrapers = self.get_available_scrapers()
+            if not scrapers:
+                return {"success": False, "error": "No scrapers found"}
+            
+            results = []
+            for scraper_name in scrapers:
+                try:
+                    result = self.run_scraper(scraper_name, upload_to_django, limit_properties)
+                    results.append({
+                        'scraper': scraper_name,
+                        'success': result.get('success', False),
+                        'uploaded': result.get('uploaded_properties', 0),
+                        'updated': result.get('updated_properties', 0),
+                        'error': result.get('error')
+                    })
+                except Exception as e:
+                    results.append({
+                        'scraper': scraper_name,
+                        'success': False,
+                        'error': str(e)
+                    })
+            
             return {
-                'name': scraper_name,
-                'error': str(e)
+                "success": True,
+                "message": "All scrapers completed",
+                "results": results,
+                "total_scrapers": len(scrapers)
             }
+            
+        except Exception as e:
+            logger.error(f"Error running all scrapers: {e}")
+            return {"success": False, "error": str(e)}

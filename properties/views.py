@@ -42,7 +42,6 @@ class PropertyCreateView(generics.CreateAPIView):
         if reference:
             try:
                 existing_property = Property.objects.get(reference=reference)
-                # Update existing property
                 serializer = PropertyUpdateSerializer(existing_property, data=request.data, partial=True)
                 if serializer.is_valid():
                     serializer.save()
@@ -51,7 +50,6 @@ class PropertyCreateView(generics.CreateAPIView):
             except Property.DoesNotExist:
                 pass
         
-        # Create new property
         return super().create(request, *args, **kwargs)
 
 
@@ -102,151 +100,92 @@ def get_property_by_reference(request, reference):
         serializer = PropertySerializer(property_obj)
         return Response(serializer.data)
     except Property.DoesNotExist:
-        return Response(
-            {'error': 'Property not found'}, 
-            status=status.HTTP_404_NOT_FOUND
-        )
+        return Response({"error": "Property not found"}, status=status.HTTP_404_NOT_FOUND)
 
 
 @extend_schema(**ALL_REGIONS_SCHEMA)
 @api_view(['GET'])
 def get_all_regions(request):
-    """Get all unique regions"""
+    """Get list of all unique regions"""
     regions = Property.objects.values_list('region', flat=True).distinct()
     return Response(list(regions))
 
 
 @extend_schema(**PATCH_PROPERTY_SCHEMA)
 @api_view(['PATCH'])
-def patch_property(request, property_id):
-    """PATCH endpoint to match FastAPI exactly"""
+def patch_property(request, pk):
+    """Partial update of property"""
     try:
-        property_obj = get_object_or_404(Property, id=property_id)
-        serializer = PropertyUpdateSerializer(property_obj, data=request.data, partial=True)
-        
+        property_obj = Property.objects.get(pk=pk)
+        serializer = PropertySerializer(property_obj, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
-    except Exception as e:
-        logger.error(f"PATCH property error: {e}")
-        return Response(
-            {'error': str(e)}, 
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+    except Property.DoesNotExist:
+        return Response({"error": "Property not found"}, status=status.HTTP_404_NOT_FOUND)
 
 
 @extend_schema(**BOT_SCRAPERS_SCHEMA)
 @api_view(['GET'])
 @permission_classes([IsAdminUser])
-def get_bot_scrapers(request):
-    """Get list of available bot scrapers (Admin only)"""
+def list_bot_scrapers(request):
+    """List available bot scrapers"""
     try:
         bot_service = BotIntegrationService()
         scrapers = bot_service.get_available_scrapers()
-        
-        # Get detailed info for each scraper
-        scraper_details = []
-        for scraper_name in scrapers:
-            details = bot_service.get_scraper_status(scraper_name)
-            scraper_details.append(details)
-        
         return Response({
-            'success': True,
-            'scrapers': scraper_details,
-            'total_scrapers': len(scrapers)
-        }, status=status.HTTP_200_OK)
-        
+            "scrapers": scrapers,
+            "total_scrapers": len(scrapers)
+        })
     except Exception as e:
-        logger.error(f"Error getting bot scrapers: {e}")
-        return Response({
-            'success': False,
-            'error': str(e)
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        logger.error(f"Error listing bot scrapers: {e}")
+        return Response({"error": "Failed to list scrapers"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @extend_schema(**RUN_BOT_SCRAPER_SCHEMA)
 @api_view(['POST'])
 @permission_classes([IsAdminUser])
 def run_bot_scraper(request):
-    """Run a specific bot scraper (Admin only)"""
+    """Run a specific bot scraper"""
     try:
-        scraper_name = request.data.get('scraper_name', 'test_scraping1')
+        scraper_name = request.data.get('scraper_name')
         upload_to_django = request.data.get('upload_to_django', True)
-        limit_properties = request.data.get('limit_properties', 3)
-
-        # Validate scraper name
+        limit_properties = request.data.get('limit_properties', 10)
+        
+        if not scraper_name:
+            return Response({"error": "scraper_name is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
         bot_service = BotIntegrationService()
-        available_scrapers = bot_service.get_available_scrapers()
+        result = bot_service.run_scraper(scraper_name, upload_to_django, limit_properties)
         
-        if scraper_name not in available_scrapers:
-            return Response({
-                'success': False,
-                'error': f'Scraper {scraper_name} not found',
-                'available_scrapers': available_scrapers
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Run the scraper directly
-        uploaded, updated = bot_service.run_scraper(scraper_name, upload_to_django, limit_properties)
-        
-        return Response({
-            'success': True,
-            'message': f'Bot scraper {scraper_name} completed successfully',
-            'scraper': scraper_name,
-            'uploaded_properties': uploaded,
-            'updated_properties': updated,
-            'total_processed': uploaded + updated
-        }, status=status.HTTP_200_OK)
-        
+        if result.get('success'):
+            return Response(result)
+        else:
+            return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
     except Exception as e:
-        logger.error(f"Bot scraper error: {e}")
-        return Response({
-            'success': False,
-            'error': str(e)
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        logger.error(f"Error running bot scraper: {e}")
+        return Response({"error": "Failed to run scraper"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @extend_schema(**RUN_ALL_SCRAPERS_SCHEMA)
 @api_view(['POST'])
 @permission_classes([IsAdminUser])
-def run_all_scrapers(request):
-    """Run all available scrapers (Admin only)"""
+def run_all_bot_scrapers(request):
+    """Run all available bot scrapers"""
     try:
         upload_to_django = request.data.get('upload_to_django', True)
-        limit_properties = request.data.get('limit_properties', 3)
-
-        # Run all scrapers directly
+        limit_properties = request.data.get('limit_properties', 10)
+        
         bot_service = BotIntegrationService()
-        available_scrapers = bot_service.get_available_scrapers()
+        result = bot_service.run_all_scrapers(upload_to_django, limit_properties)
         
-        results = []
-        for scraper_name in available_scrapers:
-            try:
-                uploaded, updated = bot_service.run_scraper(scraper_name, upload_to_django, limit_properties)
-                results.append({
-                    'scraper': scraper_name,
-                    'uploaded': uploaded,
-                    'updated': updated,
-                    'success': True
-                })
-            except Exception as e:
-                results.append({
-                    'scraper': scraper_name,
-                    'error': str(e),
-                    'success': False
-                })
-
-        return Response({
-            'success': True,
-            'message': 'All scrapers completed',
-            'results': results,
-            'total_scrapers': len(available_scrapers)
-        }, status=status.HTTP_200_OK)
-        
+        if result.get('success'):
+            return Response(result)
+        else:
+            return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
     except Exception as e:
-        logger.error(f"Run all scrapers error: {e}")
-        return Response({
-            'success': False,
-            'error': str(e)
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        logger.error(f"Error running all bot scrapers: {e}")
+        return Response({"error": "Failed to run scrapers"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

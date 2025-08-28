@@ -1,9 +1,5 @@
-# Real Estate Scraper API - Development Makefile
-# Provides common commands for development, testing, and deployment
-
 .PHONY: help install start stop restart logs clean test migrate makemigrations createsuperuser shell collectstatic build push pull
 
-# Default target
 help:
 	@echo "Real Estate Scraper API - Development Commands"
 	@echo "=============================================="
@@ -39,7 +35,6 @@ help:
 	@echo "  backup           Backup database"
 	@echo "  restore          Restore database"
 
-# Development commands
 install:
 	@echo "Installing dependencies..."
 	docker compose exec django pip install -r requirements.txt
@@ -64,7 +59,6 @@ shell:
 	@echo "Opening Django shell..."
 	docker compose exec django python manage.py shell
 
-# Database commands
 migrate:
 	@echo "Running database migrations..."
 	docker compose exec django python manage.py migrate
@@ -77,7 +71,6 @@ createsuperuser:
 	@echo "Creating superuser..."
 	docker compose exec django python manage.py createsuperuser
 
-# Testing commands
 test:
 	@echo "Running Django tests..."
 	docker compose exec django python manage.py test
@@ -88,7 +81,6 @@ test-coverage:
 	docker compose exec django coverage report
 	docker compose exec django coverage html
 
-# Maintenance commands
 collectstatic:
 	@echo "Collecting static files..."
 	docker compose exec django python manage.py collectstatic --noinput
@@ -101,7 +93,6 @@ clean:
 	find . -type f -name ".DS_Store" -delete
 	@echo "Cleanup complete!"
 
-# Docker commands
 build:
 	@echo "Building Docker images..."
 	docker compose build --no-cache
@@ -114,7 +105,6 @@ pull:
 	@echo "Pulling images from registry..."
 	docker compose pull
 
-# Production commands
 deploy:
 	@echo "Deploying to production..."
 	@echo "This command should be customized for your production environment"
@@ -129,7 +119,6 @@ restore:
 	@if [ -z "$(FILE)" ]; then echo "Please specify FILE parameter"; exit 1; fi
 	docker compose exec -T db psql -U postgres real_estate < $(FILE)
 
-# Health check
 health:
 	@echo "Checking service health..."
 	docker compose ps
@@ -137,7 +126,6 @@ health:
 	@echo "Testing API endpoints..."
 	@curl -s -o /dev/null -w "API Status: %{http_code}\n" http://localhost:8000/api/ || echo "API not responding"
 
-# Development setup
 setup:
 	@echo "Setting up development environment..."
 	@if [ ! -f .env ]; then cp env.example .env; echo "Created .env file from template"; fi
@@ -149,7 +137,6 @@ setup:
 	docker compose exec django python manage.py migrate
 	@echo "Setup complete! Access the API at http://localhost:8000/api/"
 
-# Quick development cycle
 dev:
 	@echo "Starting development environment..."
 	docker compose up -d

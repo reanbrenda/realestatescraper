@@ -1,48 +1,48 @@
 # Real Estate Scraper API
 
-A professional Django-based API for real estate property scraping, management, and data export. This application provides comprehensive property data management with integrated web scraping capabilities.
+A Django-based API for real estate property scraping, management, and data export.
 
-## 🚀 Features
+## Features
 
-- **Property Management**: Full CRUD operations for real estate properties
-- **Web Scraping Integration**: Automated property data collection from multiple platforms
-- **Advanced Filtering**: Comprehensive search and filter capabilities
-- **Data Export**: Multiple export formats (CSV, PDF, JSON)
-- **User Authentication**: JWT-based authentication with admin controls
-- **API Documentation**: Complete OpenAPI/Swagger documentation
-- **Docker Support**: Containerized deployment with Docker Compose
+- Property Management: Full CRUD operations for real estate properties
+- Web Scraping Integration: Automated property data collection from multiple platforms
+- Advanced Filtering: Comprehensive search and filter capabilities
+- Data Export: Multiple export formats (CSV, PDF, JSON)
+- User Authentication: JWT-based authentication with admin controls
+- API Documentation: Complete OpenAPI/Swagger documentation
+- Docker Support: Containerized deployment with Docker Compose
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 django_real_estate_scraper/
 ├── real_estate_scraper/          # Django project settings
 ├── properties/                   # Property management app
-├── users/                       # User authentication app
-├── exports/                     # Data export functionality
-├── services/                    # Business logic services
-├── utils/                       # Utility functions
-├── real-estate-scraper-bot/     # Web scraping bot
-└── static/                      # Static files
+├── users/                        # User authentication app
+├── exports/                      # Data export functionality
+├── services/                     # Business logic services
+├── utils/                        # Utility functions
+├── real-estate-scraper-bot/      # Web scraping bot
+└── static/                       # Static files
 ```
 
-## 🛠️ Technology Stack
+## Technology Stack
 
-- **Backend**: Django 5.0 + Django REST Framework
-- **Database**: PostgreSQL
-- **Authentication**: JWT (djangorestframework-simplejwt)
-- **API Documentation**: drf-spectacular
-- **Filtering**: django-filter
-- **Export**: reportlab (PDF), csv, json
-- **Containerization**: Docker + Docker Compose
+- Backend: Django 5.0 + Django REST Framework
+- Database: PostgreSQL
+- Authentication: JWT (djangorestframework-simplejwt)
+- API Documentation: drf-spectacular
+- Filtering: django-filter
+- Export: reportlab (PDF), csv, json
+- Containerization: Docker + Docker Compose
 
-## 📋 Prerequisites
+## Prerequisites
 
 - Docker and Docker Compose
 - Python 3.11+
 - PostgreSQL (handled by Docker)
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Clone and Setup
 
@@ -73,11 +73,11 @@ docker compose exec django python manage.py createsuperuser
 
 ### 5. Access the Application
 
-- **API**: http://localhost:8000/api/
-- **Admin**: http://localhost:8000/admin/
-- **Documentation**: http://localhost:8000/api/docs/
+- API: http://localhost:8000/api/
+- Admin: http://localhost:8000/admin/
+- Documentation: http://localhost:8000/api/docs/
 
-## 🔑 API Authentication
+## API Authentication
 
 ### Get Access Token
 
@@ -94,7 +94,7 @@ curl -H "Authorization: Bearer YOUR_TOKEN" \
   http://localhost:8000/api/properties/
 ```
 
-## 📊 API Endpoints
+## API Endpoints
 
 ### Properties
 - `GET /api/properties/` - List properties with filtering
@@ -117,7 +117,7 @@ curl -H "Authorization: Bearer YOUR_TOKEN" \
 - `POST /api/auth/login/` - User login
 - `POST /api/auth/register/` - User registration
 
-## 🔍 Filtering Examples
+## Filtering Examples
 
 ### Search Properties
 ```bash
@@ -131,7 +131,7 @@ curl "http://localhost:8000/api/properties/?price_min=300000&price_max=600000&be
 curl "http://localhost:8000/api/properties/?ordering=-price"
 ```
 
-## 🤖 Bot Scraping
+## Bot Scraping
 
 ### Run Specific Scraper
 ```bash
@@ -149,7 +149,7 @@ curl -X POST http://localhost:8000/api/bot/run-all/ \
   -d '{"limit_properties": 3}'
 ```
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 properties/           # Property management
@@ -180,7 +180,7 @@ utils/               # Utilities
 └── vector_search.py # Vector search functionality
 ```
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -200,7 +200,7 @@ DJANGO_SETTINGS_MODULE=real_estate_scraper.settings
 # JWT
 JWT_SECRET=your-jwt-secret
 JWT_ALGORITHM=HS256
-JWT_EXPIRE_MINUTES=1440  # 24 hours
+JWT_EXPIRE_MINUTES=1440
 
 # Bot Integration
 BOT_API_URL=http://django:8000/api
@@ -208,7 +208,7 @@ BOT_USERNAME=your_bot_username
 BOT_PASSWORD=your_bot_password
 ```
 
-## 🧪 Testing
+## Testing
 
 ### Run Tests
 ```bash
@@ -232,7 +232,7 @@ curl -X POST http://localhost:8000/api/properties/create/ \
   }'
 ```
 
-## 🚀 Deployment
+## Deployment
 
 ### Production Settings
 
@@ -253,7 +253,7 @@ docker build -t real-estate-scraper:prod .
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -261,18 +261,18 @@ docker compose -f docker-compose.prod.yml up -d
 4. Add tests
 5. Submit a pull request
 
-## 📝 License
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🆘 Support
+## Support
 
 For support and questions:
 - Create an issue in the repository
 - Check the API documentation at `/api/docs/`
 - Review the troubleshooting guide
 
-## 🔄 Changelog
+## Changelog
 
 ### v1.0.0
 - Initial release
@@ -284,4 +284,4 @@ For support and questions:
 
 ---
 
-**Built with ❤️ using Django and modern web technologies**
+Built with Django and modern web technologies

@@ -22,7 +22,7 @@ User = get_user_model()
 
 @extend_schema(**USER_CREATE_SCHEMA)
 class UserCreateView(generics.CreateAPIView):
-    """View for creating new users"""
+    """Create a new user account"""
     queryset = User.objects.all()
     serializer_class = UserCreateSerializer
     permission_classes = [permissions.AllowAny]
@@ -30,7 +30,7 @@ class UserCreateView(generics.CreateAPIView):
 
 @extend_schema(**USER_LIST_SCHEMA)
 class UserListView(generics.ListAPIView):
-    """View for listing users (admin only)"""
+    """List all users (admin only)"""
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsAdminUser]
@@ -38,7 +38,7 @@ class UserListView(generics.ListAPIView):
 
 @extend_schema(**USER_LIST_SCHEMA)
 class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """View for retrieving, updating, and deleting users"""
+    """Get, update, or delete a specific user (admin only)"""
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsAdminUser]
@@ -48,29 +48,7 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def login_view(request):
-    """
-    User login endpoint
-    
-    Authenticates a user with username and password, returning JWT access and refresh tokens.
-    The access token is valid for 24 hours and should be included in subsequent API requests.
-    
-    **Request Body:**
-    - username (required): User's username
-    - password (required): User's password  
-    - email (optional): User's email address
-    
-    **Response:**
-    - access: JWT access token for API authentication
-    - refresh: JWT refresh token for getting new access tokens
-    - user: User object with basic information
-    
-    **Example Usage:**
-    ```bash
-    curl -X POST http://localhost:8000/api/auth/login/ \\
-      -H "Content-Type: application/json" \\
-      -d '{"username": "testuser", "password": "testpass123"}'
-    ```
-    """
+    """Authenticate user and return JWT tokens"""
     serializer = LoginSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.validated_data['user']
@@ -89,7 +67,7 @@ def login_view(request):
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def logout_view(request):
-    """User logout endpoint"""
+    """Logout user and invalidate refresh token"""
     try:
         refresh_token = request.data.get('refresh_token')
         if refresh_token:
@@ -138,19 +116,16 @@ def add_user(request):
 @extend_schema(**DELETE_USER_SCHEMA)
 @api_view(['DELETE'])
 @permission_classes([IsAdminUser])
-def delete_user(request, user_id_to_delete):
+def delete_user(request, user_id):
     """Delete a user (admin only)"""
     try:
-        user_to_delete = User.objects.get(id=user_id_to_delete)
-        if user_to_delete.id == request.user.id:
-            return Response(
-                {'error': 'Cannot delete yourself'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        user_to_delete.delete()
+        user = User.objects.get(id=user_id)
+        if user.is_superuser:
+            return Response({'error': 'Cannot delete superuser'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        user.delete()
         return Response({'message': 'User deleted successfully'})
     except User.DoesNotExist:
-        return Response(
-            {'error': 'User not found'}, 
-            status=status.HTTP_404_NOT_FOUND
-        )
+        return Response({'error': 'User not found'}, 
+                       status=status.HTTP_404_NOT_FOUND)

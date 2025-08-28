@@ -1,32 +1,21 @@
-# Real Estate Scraper API - Docker Compose Configuration
-# This file defines the services needed to run the application
-
 services:
-  # Django Web Application
   django:
     build: .
     container_name: real-estate-django
     ports:
       - "8000:8000"
     environment:
-      # Django Configuration
       - DEBUG=${DEBUG:-1}
       - DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE:-real_estate_scraper.settings}
-      
-      # Database Configuration
       - DB_HOST=${DB_HOST:-db}
       - DB_NAME=${DB_NAME:-real_estate}
       - DB_USER=${DB_USER:-postgres}
       - DB_PASSWORD=${DB_PASSWORD:-postgres}
       - DB_PORT=${DB_PORT:-5432}
-      
-      # Security Configuration
       - SECRET_KEY=${SECRET_KEY:-django-insecure-change-this-in-production}
       - JWT_SECRET=${JWT_SECRET:-django-insecure-change-this-in-production}
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
       - JWT_EXPIRE_MINUTES=${JWT_EXPIRE_MINUTES:-1440}
-      
-      # Client Configuration
       - CLIENT_URLS=${CLIENT_URLS:-http://localhost:3000}
     volumes:
       - .:/app
@@ -40,7 +29,6 @@ services:
     networks:
       - real-estate-network
 
-  # PostgreSQL Database
   db:
     image: postgres:15-alpine
     container_name: real-estate-db
@@ -61,7 +49,6 @@ services:
     networks:
       - real-estate-network
 
-# Named Volumes for Data Persistence
 volumes:
   postgres_data:
     driver: local
@@ -70,7 +57,6 @@ volumes:
   media_volume:
     driver: local
 
-# Custom Network for Service Communication
 networks:
   real-estate-network:
     driver: bridge
