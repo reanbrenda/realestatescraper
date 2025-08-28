@@ -13,34 +13,19 @@ import csv
 import io
 import json
 from properties.models import Property
-# OpenAPI documentation removed - views no longer have schema decorators
+from drf_spectacular.utils import extend_schema
+from .schemas import (
+    EXPORT_CSV_SCHEMA,
+    EXPORT_PDF_SCHEMA,
+    EXPORT_JSON_SCHEMA
+)
 
 
+@extend_schema(**EXPORT_CSV_SCHEMA)
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def export_properties_csv(request):
-    """
-    Export properties to CSV format
-    
-    **Request Body:**
-    - property_ids (required): Array of property IDs to export
-    
-    **Response:**
-    - CSV file download with property data
-    
-    **CSV Columns:**
-    - Reference, Title, Category, Price, Square Meters
-    - Region, Town, Bedrooms, Bathrooms, Platform
-    - Link, Created At
-    
-    **Example Usage:**
-    ```bash
-    curl -X POST http://localhost:8000/api/export/csv/ \\
-      -H "Authorization: Bearer YOUR_TOKEN" \\
-      -H "Content-Type: application/json" \\
-      -d '{"property_ids": [1, 2, 3]}'
-    ```
-    """
+    """Export properties to CSV format"""
     property_ids = request.data.get('property_ids', [])
     
     if not property_ids:
@@ -82,32 +67,11 @@ def export_properties_csv(request):
     return response
 
 
-# OpenAPI documentation removed - schema defined in api_docs.py
+@extend_schema(**EXPORT_PDF_SCHEMA)
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def export_properties_pdf(request):
-    """
-    Export properties to PDF format
-    
-    **Request Body:**
-    - property_ids (required): Array of property IDs to export (max 4 for optimal layout)
-    
-    **Response:**
-    - PDF file download with formatted property table
-    
-    **PDF Features:**
-    - Professional table layout with styling
-    - Limited to 4 properties for best formatting
-    - Includes: Reference, Title, Price, Region, Platform
-    
-    **Example Usage:**
-    ```bash
-    curl -X POST http://localhost:8000/api/export/pdf/ \\
-      -H "Authorization: Bearer YOUR_TOKEN" \\
-      -H "Content-Type: application/json" \\
-      -d '{"property_ids": [1, 2, 3, 4]}'
-    ```
-    """
+    """Export properties to PDF format (max 4 properties for optimal layout)"""
     property_ids = request.data.get('property_ids', [])
     
     if not property_ids:
@@ -166,32 +130,11 @@ def export_properties_pdf(request):
     return response
 
 
-# OpenAPI documentation removed - schema defined in api_docs.py
+@extend_schema(**EXPORT_JSON_SCHEMA)
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def export_properties_json(request):
-    """
-    Export properties to JSON format
-    
-    **Request Body:**
-    - property_ids (required): Array of property IDs to export
-    
-    **Response:**
-    - JSON file download with complete property data
-    
-    **JSON Fields:**
-    - reference, title, category, price, square_meters
-    - region, town, bedrooms, bathrooms, platform
-    - link, created_at
-    
-    **Example Usage:**
-    ```bash
-    curl -X POST http://localhost:8000/api/export/json/ \\
-      -H "Authorization: Bearer YOUR_TOKEN" \\
-      -H "Content-Type: application/json" \\
-      -d '{"property_ids": [1, 2, 3]}'
-    ```
-    """
+    """Export properties to JSON format with complete property data"""
     property_ids = request.data.get('property_ids', [])
     
     if not property_ids:

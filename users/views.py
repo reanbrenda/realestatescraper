@@ -6,51 +6,21 @@ from django.contrib.auth import get_user_model
 from drf_spectacular.utils import extend_schema
 from .serializers import UserSerializer, UserCreateSerializer, LoginSerializer
 from .permissions import IsAdminUser
-# OpenAPI documentation schemas defined directly in decorators
+from .schemas import (
+    LOGIN_SCHEMA,
+    USER_CREATE_SCHEMA,
+    LOGOUT_SCHEMA,
+    CHECK_AUTH_SCHEMA,
+    CHECK_ADMIN_SCHEMA,
+    USER_LIST_SCHEMA,
+    ADD_USER_SCHEMA,
+    DELETE_USER_SCHEMA
+)
 
 User = get_user_model()
 
 
-@extend_schema(
-    summary="User Registration",
-    description="Create a new user account",
-    tags=["Authentication"],
-    request={
-        'application/json': {
-            'type': 'object',
-            'properties': {
-                'username': {'type': 'string', 'description': 'Username for the new account', 'example': 'newuser'},
-                'email': {'type': 'string', 'description': 'Email address', 'example': 'newuser@example.com'},
-                'password': {'type': 'string', 'description': 'Password for the account', 'example': 'securepass123'},
-                'password_confirm': {'type': 'string', 'description': 'Password confirmation', 'example': 'securepass123'},
-            },
-            'required': ['username', 'email', 'password', 'password_confirm']
-        }
-    },
-    responses={
-        201: {
-            'description': 'User created successfully',
-            'type': 'object',
-            'properties': {
-                'id': {'type': 'integer'},
-                'username': {'type': 'string'},
-                'email': {'type': 'string'},
-                'is_admin': {'type': 'boolean'},
-                'date_joined': {'type': 'string', 'format': 'date-time'},
-            }
-        },
-        400: {
-            'description': 'Validation errors',
-            'type': 'object',
-            'properties': {
-                'username': {'type': 'array', 'items': {'type': 'string'}},
-                'email': {'type': 'array', 'items': {'type': 'string'}},
-                'password': {'type': 'array', 'items': {'type': 'string'}},
-                'password_confirm': {'type': 'array', 'items': {'type': 'string'}},
-            }
-        }
-    }
-)
+@extend_schema(**USER_CREATE_SCHEMA)
 class UserCreateView(generics.CreateAPIView):
     """View for creating new users"""
     queryset = User.objects.all()
@@ -58,11 +28,7 @@ class UserCreateView(generics.CreateAPIView):
     permission_classes = [permissions.AllowAny]
 
 
-@extend_schema(
-    summary="List All Users",
-    description="Get a list of all users (Admin only)",
-    tags=["User Management"]
-)
+@extend_schema(**USER_LIST_SCHEMA)
 class UserListView(generics.ListAPIView):
     """View for listing users (admin only)"""
     queryset = User.objects.all()
@@ -70,11 +36,7 @@ class UserListView(generics.ListAPIView):
     permission_classes = [IsAdminUser]
 
 
-@extend_schema(
-    summary="User Detail",
-    description="Retrieve, update, and delete users",
-    tags=["User Management"]
-)
+@extend_schema(**USER_LIST_SCHEMA)
 class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     """View for retrieving, updating, and deleting users"""
     queryset = User.objects.all()
@@ -82,49 +44,7 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAdminUser]
 
 
-@extend_schema(
-    summary="User Login",
-    description="Authenticate user and return JWT tokens",
-    tags=["Authentication"],
-    request={
-        'application/json': {
-            'type': 'object',
-            'properties': {
-                'username': {'type': 'string', 'description': "User's username", 'example': 'testuser'},
-                'password': {'type': 'string', 'description': "User's password", 'example': 'testpass123'},
-                'email': {'type': 'string', 'description': "User's email (optional)", 'example': 'test@example.com'},
-            },
-            'required': ['username', 'password']
-        }
-    },
-    responses={
-        200: {
-            'description': 'Login successful',
-            'type': 'object',
-            'properties': {
-                'access': {'type': 'string', 'description': 'JWT access token'},
-                'refresh': {'type': 'string', 'description': 'JWT refresh token'},
-                'user': {
-                    'type': 'object',
-                    'properties': {
-                        'id': {'type': 'integer'},
-                        'username': {'type': 'string'},
-                        'is_admin': {'type': 'boolean'},
-                        'date_joined': {'type': 'string', 'format': 'date-time'},
-                    }
-                }
-            }
-        },
-        400: {
-            'description': 'Invalid credentials',
-            'type': 'object',
-            'properties': {
-                'username': {'type': 'array', 'items': {'type': 'string'}},
-                'password': {'type': 'array', 'items': {'type': 'string'}}
-            }
-        }
-    }
-)
+@extend_schema(**LOGIN_SCHEMA)
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def login_view(request):
@@ -165,11 +85,7 @@ def login_view(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@extend_schema(
-    summary="User Logout",
-    description="Logout user and invalidate refresh token",
-    tags=["Authentication"]
-)
+@extend_schema(**LOGOUT_SCHEMA)
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def logout_view(request):
@@ -188,11 +104,7 @@ def logout_view(request):
                        status=status.HTTP_400_BAD_REQUEST)
 
 
-@extend_schema(
-    summary="Check Authentication Status",
-    description="Check if the current user is authenticated",
-    tags=["Authentication"]
-)
+@extend_schema(**CHECK_AUTH_SCHEMA)
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def check_auth(request):
@@ -200,11 +112,7 @@ def check_auth(request):
     return Response({'user_id': request.user.id})
 
 
-@extend_schema(
-    summary="Check Admin Status",
-    description="Check if the current user has admin privileges",
-    tags=["Authentication"]
-)
+@extend_schema(**CHECK_ADMIN_SCHEMA)
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def check_admin(request):
@@ -215,11 +123,7 @@ def check_admin(request):
         return Response({'is_admin': False, 'user_id': request.user.id})
 
 
-@extend_schema(
-    summary="Add New User",
-    description="Create a new user account (Admin only)",
-    tags=["User Management"]
-)
+@extend_schema(**ADD_USER_SCHEMA)
 @api_view(['POST'])
 @permission_classes([IsAdminUser])
 def add_user(request):
@@ -231,11 +135,7 @@ def add_user(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@extend_schema(
-    summary="Delete User",
-    description="Delete a user account (Admin only)",
-    tags=["User Management"]
-)
+@extend_schema(**DELETE_USER_SCHEMA)
 @api_view(['DELETE'])
 @permission_classes([IsAdminUser])
 def delete_user(request, user_id_to_delete):

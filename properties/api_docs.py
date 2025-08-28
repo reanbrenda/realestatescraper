@@ -599,3 +599,216 @@ RUN_ALL_SCRAPERS_SCHEMA = {
         )
     ]
 }
+
+# Property Detail Schema
+PROPERTY_DETAIL_SCHEMA = {
+    'summary': "Get Property Details",
+    'description': "Retrieve detailed information about a specific property by ID",
+    'tags': ["Properties"],
+    'responses': {
+        200: {
+            'description': 'Property details retrieved successfully',
+            'type': 'object',
+            'properties': {
+                'id': {'type': 'integer'},
+                'reference': {'type': 'string'},
+                'title': {'type': 'string'},
+                'category': {'type': 'string'},
+                'price': {'type': 'number'},
+                'square_meters': {'type': 'number'},
+                'region': {'type': 'string'},
+                'town': {'type': 'string'},
+                'bedrooms': {'type': 'integer'},
+                'bathrooms': {'type': 'integer'},
+                'platform': {'type': 'string'},
+                'link': {'type': 'string'},
+                'created_at': {'type': 'string', 'format': 'date-time'},
+                'updated_at': {'type': 'string', 'format': 'date-time'}
+            }
+        },
+        404: {
+            'description': 'Property not found',
+            'type': 'object',
+            'properties': {
+                'detail': {'type': 'string', 'example': 'Not found'}
+            }
+        }
+    }
+}
+
+# Property Update Schema
+PROPERTY_UPDATE_SCHEMA = {
+    'summary': "Update Property",
+    'description': "Update an existing property with new data",
+    'tags': ["Properties"],
+    'request': {
+        'application/json': {
+            'type': 'object',
+            'properties': {
+                'title': {'type': 'string', 'description': 'Property title/name'},
+                'price': {'type': 'number', 'description': 'Property price in euros'},
+                'square_meters': {'type': 'number', 'description': 'Property size in square meters'},
+                'bedrooms': {'type': 'integer', 'description': 'Number of bedrooms'},
+                'bathrooms': {'type': 'integer', 'description': 'Number of bathrooms'},
+                'description': {'type': 'string', 'description': 'Property description'},
+                'photos': {
+                    'type': 'array',
+                    'items': {'type': 'string'},
+                    'description': 'List of photo URLs'
+                }
+            }
+        }
+    },
+    'responses': {
+        200: {
+            'description': 'Property updated successfully',
+            'type': 'object',
+            'properties': {
+                'id': {'type': 'integer'},
+                'reference': {'type': 'string'},
+                'title': {'type': 'string'},
+                'price': {'type': 'number'},
+                'updated_at': {'type': 'string', 'format': 'date-time'}
+            }
+        },
+        400: {
+            'description': 'Bad request - validation errors',
+            'type': 'object',
+            'properties': {
+                'field_name': {'type': 'array', 'items': {'type': 'string'}}
+            }
+        },
+        404: {
+            'description': 'Property not found',
+            'type': 'object',
+            'properties': {
+                'detail': {'type': 'string', 'example': 'Not found'}
+            }
+        }
+    }
+}
+
+# Property Delete Schema
+PROPERTY_DELETE_SCHEMA = {
+    'summary': "Delete Property",
+    'description': "Delete a specific property by ID",
+    'tags': ["Properties"],
+    'responses': {
+        200: {
+            'description': 'Property deleted successfully',
+            'type': 'object',
+            'properties': {
+                'message': {'type': 'string', 'example': 'Property deleted successfully'}
+            }
+        },
+        404: {
+            'description': 'Property not found',
+            'type': 'object',
+            'properties': {
+                'detail': {'type': 'string', 'example': 'Not found'}
+            }
+        }
+    }
+}
+
+# Property by Reference Schema
+PROPERTY_BY_REFERENCE_SCHEMA = {
+    'summary': "Get Property by Reference",
+    'description': "Retrieve a property by its unique reference number",
+    'tags': ["Properties"],
+    'responses': {
+        200: {
+            'description': 'Property retrieved successfully',
+            'type': 'object',
+            'properties': {
+                'id': {'type': 'integer'},
+                'reference': {'type': 'string'},
+                'title': {'type': 'string'},
+                'price': {'type': 'number'},
+                'region': {'type': 'string'},
+                'platform': {'type': 'string'}
+            }
+        },
+        404: {
+            'description': 'Property not found',
+            'type': 'object',
+            'properties': {
+                'error': {'type': 'string', 'example': 'Property not found'}
+            }
+        }
+    }
+}
+
+# All Regions Schema
+ALL_REGIONS_SCHEMA = {
+    'summary': "Get All Regions",
+    'description': "Retrieve a list of all unique regions where properties are located",
+    'tags': ["Properties"],
+    'responses': {
+        200: {
+            'description': 'List of regions retrieved successfully',
+            'type': 'array',
+            'items': {'type': 'string'},
+            'example': ['Mallorca', 'Menorca', 'Ibiza', 'Formentera']
+        }
+    }
+}
+
+# Patch Property Schema
+PATCH_PROPERTY_SCHEMA = {
+    'summary': "Patch Property",
+    'description': "Partially update a property with PATCH method",
+    'tags': ["Properties"],
+    'request': {
+        'application/json': {
+            'type': 'object',
+            'properties': {
+                'title': {'type': 'string', 'description': 'Property title/name'},
+                'price': {'type': 'number', 'description': 'Property price in euros'},
+                'square_meters': {'type': 'number', 'description': 'Property size in square meters'},
+                'bedrooms': {'type': 'integer', 'description': 'Number of bedrooms'},
+                'bathrooms': {'type': 'integer', 'description': 'Number of bathrooms'},
+                'description': {'type': 'string', 'description': 'Property description'},
+                'photos': {
+                    'type': 'array',
+                    'items': {'type': 'string'},
+                    'description': 'List of photo URLs'
+                }
+            }
+        }
+    },
+    'responses': {
+        200: {
+            'description': 'Property patched successfully',
+            'type': 'object',
+            'properties': {
+                'id': {'type': 'integer'},
+                'reference': {'type': 'string'},
+                'title': {'type': 'string'},
+                'price': {'type': 'number'},
+                'updated_at': {'type': 'string', 'format': 'date-time'}
+            }
+        },
+        400: {
+            'description': 'Bad request - validation errors',
+            'type': 'object',
+            'properties': {
+                'field_name': {'type': 'array', 'items': {'type': 'string'}}
+            }
+        },
+        404: {
+            'description': 'Property not found',
+            'type': 'object',
+            'properties': {
+                'detail': {'type': 'string', 'example': 'Not found'}
+            }
+        },
+        500: {
+            'description': 'Internal server error',
+            'type': 'object',
+            'properties': {
+                'error': {'type': 'string'}
+            }
+        }
+    }
+}

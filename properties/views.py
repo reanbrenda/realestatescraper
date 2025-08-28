@@ -10,51 +10,29 @@ from .models import Property
 from .serializers import PropertySerializer, PropertyCreateSerializer, PropertyUpdateSerializer
 from .filters import PropertyFilter
 from services.bot_integration import BotIntegrationService
-# OpenAPI documentation removed - views no longer have schema decorators
+from drf_spectacular.utils import extend_schema
+from .schemas import (
+    PROPERTY_CREATE_SCHEMA,
+    PROPERTY_LIST_SCHEMA,
+    PROPERTY_DETAIL_SCHEMA,
+    PROPERTY_UPDATE_SCHEMA,
+    PROPERTY_DELETE_SCHEMA,
+    PROPERTY_BY_REFERENCE_SCHEMA,
+    ALL_REGIONS_SCHEMA,
+    PATCH_PROPERTY_SCHEMA,
+    BOT_SCRAPERS_SCHEMA,
+    RUN_BOT_SCRAPER_SCHEMA,
+    RUN_ALL_SCRAPERS_SCHEMA
+)
 import logging
 from .pagination import PropertyPagination
 
 logger = logging.getLogger(__name__)
 
 
-# OpenAPI documentation removed - schema defined in api_docs.py
+@extend_schema(**PROPERTY_CREATE_SCHEMA)
 class PropertyCreateView(generics.CreateAPIView):
-    """
-    Create a new property or update if reference number exists
-    
-    **Key Features:**
-    - **Photos Field**: Accepts an array of image URLs (strings)
-    - **Auto-update**: If reference exists, updates the existing property
-    - **Flexible Data**: Most fields are optional except reference, title, price, square_meters, region, platform, link
-    
-    **Data Types:**
-    - **Strings**: reference, title, category, region, town, description, platform, link
-    - **Numbers**: price, square_meters, land_area, built_up
-    - **Integers**: bedrooms, bathrooms
-    - **Arrays**: photos (list of URL strings)
-    - **Booleans**: on_off
-    - **Dates**: property_created_at
-    
-    **Example Usage:**
-    ```bash
-    curl -X POST http://localhost:8000/api/properties/create/ \\
-      -H "Authorization: Bearer YOUR_TOKEN" \\
-      -H "Content-Type: application/json" \\
-      -d '{
-        "reference": "idealista_12345",
-        "title": "Beautiful apartment in Palma",
-        "price": 450000.0,
-        "square_meters": 85.5,
-        "region": "Mallorca",
-        "platform": "idealista",
-        "link": "https://www.idealista.com/inmueble/12345/",
-        "photos": [
-          "https://example.com/photo1.jpg",
-          "https://example.com/photo2.jpg"
-        ]
-      }'
-    ```
-    """
+    """Create a new property or update if reference number exists"""
     queryset = Property.objects.all()
     serializer_class = PropertyCreateSerializer
 
@@ -77,39 +55,9 @@ class PropertyCreateView(generics.CreateAPIView):
         return super().create(request, *args, **kwargs)
 
 
-# OpenAPI documentation removed - schema defined in api_docs.py
+@extend_schema(**PROPERTY_LIST_SCHEMA)
 class PropertyListView(generics.ListAPIView):
-    """
-    List properties with filtering and pagination
-    
-    **Search & Filtering:**
-    - **Search**: Use `search` parameter to search in title, description, region, town
-    - **Price Range**: `price_min` and `price_max` for price filtering
-    - **Location**: `region` and `town` for location filtering
-    - **Features**: `bedrooms`, `bathrooms` for feature filtering
-    - **Platform**: `platform` to filter by source website
-    - **Category**: `category` to filter by property type
-    
-    **Sorting:**
-    - **Default**: Properties sorted by creation date (newest first)
-    - **Custom**: Use `ordering` parameter (e.g., `price`, `-price`, `square_meters`)
-    
-    **Pagination:**
-    - **Page Size**: 100 properties per page
-    - **Navigation**: Use `page` parameter and follow `next`/`previous` links
-    
-    **Example Usage:**
-    ```bash
-    # Search for apartments in Palma
-    curl "http://localhost:8000/api/properties/?search=palma%20apartment&region=Mallorca&category=apartment"
-    
-    # Filter by price and bedrooms
-    curl "http://localhost:8000/api/properties/?price_min=300000&price_max=600000&bedrooms=2"
-    
-    # Sort by price (highest first)
-    curl "http://localhost:8000/api/properties/?ordering=-price"
-    ```
-    """
+    """List properties with filtering and pagination"""
     queryset = Property.objects.all()
     serializer_class = PropertySerializer
     filterset_class = PropertyFilter
@@ -119,18 +67,21 @@ class PropertyListView(generics.ListAPIView):
     pagination_class = PropertyPagination
 
 
+@extend_schema(**PROPERTY_DETAIL_SCHEMA)
 class PropertyDetailView(generics.RetrieveAPIView):
     """Retrieve a specific property by ID"""
     queryset = Property.objects.all()
     serializer_class = PropertySerializer
 
 
+@extend_schema(**PROPERTY_UPDATE_SCHEMA)
 class PropertyUpdateView(generics.UpdateAPIView):
     """Update a specific property"""
     queryset = Property.objects.all()
     serializer_class = PropertyUpdateSerializer
 
 
+@extend_schema(**PROPERTY_DELETE_SCHEMA)
 class PropertyDeleteView(generics.DestroyAPIView):
     """Delete a specific property"""
     queryset = Property.objects.all()
@@ -142,6 +93,7 @@ class PropertyDeleteView(generics.DestroyAPIView):
         return Response({"message": "Property deleted successfully"}, status=status.HTTP_200_OK)
 
 
+@extend_schema(**PROPERTY_BY_REFERENCE_SCHEMA)
 @api_view(['GET'])
 def get_property_by_reference(request, reference):
     """Get property by reference number"""
@@ -156,6 +108,7 @@ def get_property_by_reference(request, reference):
         )
 
 
+@extend_schema(**ALL_REGIONS_SCHEMA)
 @api_view(['GET'])
 def get_all_regions(request):
     """Get all unique regions"""
@@ -163,6 +116,7 @@ def get_all_regions(request):
     return Response(list(regions))
 
 
+@extend_schema(**PATCH_PROPERTY_SCHEMA)
 @api_view(['PATCH'])
 def patch_property(request, property_id):
     """PATCH endpoint to match FastAPI exactly"""
@@ -183,24 +137,11 @@ def patch_property(request, property_id):
         )
 
 
-# OpenAPI documentation removed - schema defined in api_docs.py
+@extend_schema(**BOT_SCRAPERS_SCHEMA)
 @api_view(['GET'])
 @permission_classes([IsAdminUser])
 def get_bot_scrapers(request):
-    """
-    Get list of available bot scrapers (Admin only)
-    
-    **Response:**
-    - success: Boolean indicating if the request was successful
-    - scrapers: Array of scraper objects with details
-    - total_scrapers: Total number of available scrapers
-    
-    **Example Usage:**
-    ```bash
-    curl -X GET http://localhost:8000/api/bot/scrapers/ \\
-      -H "Authorization: Bearer YOUR_TOKEN"
-    ```
-    """
+    """Get list of available bot scrapers (Admin only)"""
     try:
         bot_service = BotIntegrationService()
         scrapers = bot_service.get_available_scrapers()
@@ -225,34 +166,11 @@ def get_bot_scrapers(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-# OpenAPI documentation removed - schema defined in api_docs.py
+@extend_schema(**RUN_BOT_SCRAPER_SCHEMA)
 @api_view(['POST'])
 @permission_classes([IsAdminUser])
 def run_bot_scraper(request):
-    """
-    Run a specific bot scraper (Admin only)
-    
-    **Request Body:**
-    - scraper_name (required): Name of the scraper to execute
-    - upload_to_django (optional): Whether to upload properties to Django (default: true)
-    - limit_properties (optional): Maximum properties to process (default: 3)
-    
-    **Response:**
-    - success: Boolean indicating if the scraper ran successfully
-    - message: Human-readable success message
-    - scraper: Name of the executed scraper
-    - uploaded_properties: Number of new properties uploaded
-    - updated_properties: Number of existing properties updated
-    - total_processed: Total number of properties processed
-    
-    **Example Usage:**
-    ```bash
-    curl -X POST http://localhost:8000/api/bot/run/ \\
-      -H "Authorization: Bearer YOUR_TOKEN" \\
-      -H "Content-Type: application/json" \\
-      -d '{"scraper_name": "test_scraping1", "upload_to_django": true, "limit_properties": 3}'
-    ```
-    """
+    """Run a specific bot scraper (Admin only)"""
     try:
         scraper_name = request.data.get('scraper_name', 'test_scraping1')
         upload_to_django = request.data.get('upload_to_django', True)
@@ -289,31 +207,11 @@ def run_bot_scraper(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-# OpenAPI documentation removed - schema defined in api_docs.py
+@extend_schema(**RUN_ALL_SCRAPERS_SCHEMA)
 @api_view(['POST'])
 @permission_classes([IsAdminUser])
 def run_all_scrapers(request):
-    """
-    Run all available scrapers (Admin only)
-    
-    **Request Body:**
-    - upload_to_django (optional): Whether to upload properties to Django (default: true)
-    - limit_properties (optional): Maximum properties to process per scraper (default: 3)
-    
-    **Response:**
-    - success: Boolean indicating if all scrapers ran successfully
-    - message: Human-readable success message
-    - results: Array of results for each scraper
-    - total_scrapers: Total number of scrapers executed
-    
-    **Example Usage:**
-    ```bash
-    curl -X POST http://localhost:8000/api/bot/run-all/ \\
-      -H "Authorization: Bearer YOUR_TOKEN" \\
-      -H "Content-Type: application/json" \\
-      -d '{"upload_to_django": true, "limit_properties": 3}'
-    ```
-    """
+    """Run all available scrapers (Admin only)"""
     try:
         upload_to_django = request.data.get('upload_to_django', True)
         limit_properties = request.data.get('limit_properties', 3)
