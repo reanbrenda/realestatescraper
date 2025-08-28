@@ -107,7 +107,7 @@ python run_scraper.py --all --limit 3
 python run_scraper.py --scraper test_scraping1 --output results.json
 ```
 
-## Development
+
 
 ### Project Structure
 ```
@@ -152,14 +152,3 @@ The bot integration service uses these environment variables:
 
 
 
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## License
-
-This project is for educational and development purposes.
