@@ -1,0 +1,23 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<h1>Bulk Update Platform</h1>
+<p>You have selected {{ queryset.count }} properties to update.</p>
+
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <input type="submit" name="apply" value="Apply Update" />
+    <a href="{% url 'admin:properties_property_changelist' %}" class="button cancel-link">Cancel</a>
+</form>
+
+<div style="margin-top: 20px;">
+    <h3>Selected Properties:</h3>
+    <ul>
+    {% for property in queryset %}
+        <li>{{ property.reference }} - {{ property.title }} ({{ property.region }})</li>
+    {% endfor %}
+    </ul>
+</div>
+{% endblock %}
+
